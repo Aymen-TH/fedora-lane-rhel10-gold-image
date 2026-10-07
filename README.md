@@ -262,14 +262,6 @@ RHEL 10 Gold Image
 The approximately 8 GB ISO is **not** the Gold Image that will be uploaded
 to AWS or Azure.
 
-### Evidence
-
-Screenshot:
-
-```text
-docs/screenshots/01-rhel10-iso.png
-```
-
 ---
 
 ## 5.2 Create the RHEL 10 Build VM
@@ -302,13 +294,6 @@ rhel10.0-GOLDEN
 The VM provides an isolated environment where the RHEL system can be built,
 configured, hardened, and tested before being captured as the Gold Image.
 
-### Evidence
-
-Screenshot:
-
-```text
-docs/screenshots/02-vm-configuration.png
-```
 
 ---
 
@@ -347,14 +332,6 @@ The required dedicated filesystems are kept below 5 GiB.
 
 The remaining disk space is used for the root filesystem and the other
 required system partitions.
-
-### Evidence
-
-Screenshot:
-
-```text
-docs/screenshots/03-installation-destination.png
-```
 
 ---
 
@@ -518,30 +495,119 @@ to perform required system administration tasks.
 
 # 10. Phase 6 - HTTP Service
 
-The Gold Image must contain an HTTP service.
+````markdown
+## Containerized HTTP Service
 
-The initial implementation will use:
+The HTTP workload is implemented using **Podman** rather than running the
+`httpd` service directly on the RHEL host.
 
-```text
-httpd
-```
-
-The service must listen on:
+The architecture is:
 
 ```text
-35443
-```
-
-A simple test page will be created:
-
-```text
+Client
+   │
+   │ TCP 35443
+   ▼
+RHEL 10 Host
+   │
+   │ Podman port mapping
+   │ 35443 → 80
+   ▼
+httpd Container
+   │
+   │ Apache HTTP Server :80
+   ▼
 index.html
+````
+
+The host exposes port `35443`, while Apache listens on its standard HTTP port
+`80` inside the container.
+
+The containerized implementation provides:
+
+* Apache HTTP Server running inside a Podman container
+* Host port `35443` mapped to container port `80`
+* Persistent web content stored outside the container
+* SELinux-compatible container volume labeling
+* Firewall access limited to the required HTTP port
+* Automatic container startup after reboot
+
+### Container Configuration
+
+The HTTP workload was configured using Podman.
+
+The implementation consists of the following steps:
+
+1. Create a dedicated directory on the RHEL host for the HTTP content.
+2. Create a basic `index.html` file in this directory.
+3. Apply the appropriate SELinux container file context to the directory.
+4. Create the `httpd` container from the official Apache HTTP image.
+5. Mount the host content directory into the Apache document root.
+6. Map host port `35443` to port `80` inside the container.
+7. Verify that the container is running and that the HTTP page is accessible.
+8. Verify that the firewall allows TCP port `35443`.
+
+### Container Persistence
+
+A manually started container would not be sufficient for the Gold Image because
+the HTTP service must automatically return after a reboot.
+
+Podman **Quadlet** was therefore used to integrate the container with
+`systemd`.
+
+The persistence configuration consists of the following steps:
+
+1. Create a Podman Quadlet configuration for the HTTP container.
+2. Define the container image, container name, port mapping, and persistent
+   volume in the Quadlet configuration.
+3. Configure the container to restart automatically .
+4. Integrate the container with the system boot process through the generated
+   `systemd` service.
+5. Reboot the RHEL VM.
+6. Verify that the container is automatically recreated/started.
+7. Verify that the HTTP service is still accessible on port `35443`.
+
+This ensures that the Gold Image does not depend on manually starting the
+container after every reboot.
+
+### Persistence Architecture
+
+```text
+                    RHEL 10 Gold Image
+                           │
+             ┌─────────────┴─────────────┐
+             │                           │
+      Quadlet configuration       Persistent content
+             │                           │
+             ▼                           ▼
+        systemd service          /opt/fedora-lane/httpd locally mounted on /usr/local/apache2/htdocs 
+             │                           │
+             └─────────────┬─────────────┘
+                           ▼
+                    Podman container
+                           │
+                    httpd :80
+                           │
+                    Host :35443
 ```
 
-The page provides a basic way to demonstrate that the HTTP service is
-running correctly.
+The container itself is treated as a replaceable workload, while the web
+content is maintained on the host through the persistent volume.
 
-The service will also be configured to start automatically after reboot.
+### Validation
+
+The containerized HTTP service was validated by:
+
+* verifying the Podman container is running
+* verifying port `35443` is exposed
+* verifying the test `index.html` is returned
+* verifying SELinux remains enforcing
+* verifying the firewall allows port `35443`
+* rebooting the VM
+* verifying the container automatically starts after reboot
+* verifying the HTTP service remains accessible after reboot
+
+````
 
 ## SELinux
 
@@ -550,28 +616,6 @@ to allow `httpd` to use this port.
 
 SELinux will remain enforcing.
 
-## Container Option
-
-Fedora Lane prefers the HTTP workload to run in a container where practical.
-
-The container-based implementation will therefore be evaluated during the
-build.
-
-If the container approach is used, the container must still satisfy the
-same requirements:
-
-* HTTP service on port `35443`
-* correct SELinux behavior
-* automatic startup
-* persistent configuration
-* firewall access
-* successful operation after reboot
-
-If the container approach introduces unnecessary complexity or prevents the
-Gold Image requirements from being met reliably, the native `httpd`
-implementation can be used as the baseline.
-
----
 
 # 11. Phase 7 - Firewall
 
@@ -634,7 +678,7 @@ The system must not depend on manually starting services after every reboot.
 
 # 13. Phase 9 - Validation
 
-Before creating the Gold Image, the entire system will be validated.
+Before creating the Gold Image, the entire system will be validated throught a script that will validate :
 
 ## Storage
 
@@ -738,6 +782,37 @@ Validated RHEL 10 system
     │ capture / package
     ▼
 RHEL 10 Gold Image
+
+
+### QCOW2 → RAW conversion
+
+The VM was originally stored as a **QCOW2** disk image, which is optimized for virtualization and supports features such as snapshots, compression, and thin provisioning :
+<img width="865" height="343" alt="image" src="https://github.com/user-attachments/assets/36b4bed8-ad1b-4df9-9db3-8332b5d4e904" />
+
+For cloud deployment, we converted the image to **RAW**, a simple sector-by-sector disk representation that is more widely supported by cloud image-import tools :
+
+<img width="2086" height="775" alt="image" src="https://github.com/user-attachments/assets/16f0bd25-067f-4c87-9f78-fe28e4e73618" />
+
+
+```text
+QCOW2
+  │
+  │ qemu-img convert
+  ▼
+RAW
+  │
+  ▼
+Cloud image import
+```
+
+
+* **QCOW2:** virtualization-friendly format used by KVM/QEMU.
+* **RAW:** simple representation of the VM's virtual disk, without QCOW2-specific features.
+* **Why convert?** The goal is to package the validated VM disk in a format suitable for the target cloud's image-import process.
+
+**Important:** The RAW image still represents the same **40 GiB virtual disk**; conversion does not change the OS, partitions, or configuration.
+
+
 ```
 
 The Gold Image should contain the complete validated operating system
@@ -748,26 +823,31 @@ The installation ISO itself is not uploaded as the Gold Image.
 A proper cloud-compatible image/capture process will be used for the target
 cloud platform.
 
+
 ---
 
 # 15. Phase 11 - Cloud Deployment
 
 The Gold Image will be prepared for deployment to AWS and/or Azure.
 
-The mandatory objective is to demonstrate that the resulting image can be
-used to provision a working RHEL server in a cloud environment.
-
 The deployment process will include:
 
-1. Upload/import the Gold Image into the target cloud.
-2. Create a VM from the image.
-3. Start the VM.
-4. Connect using the configured administrative access.
-5. Verify the security configuration.
-6. Verify the HTTP service.
-7. Verify the firewall.
-8. Reboot the cloud VM.
-9. Verify that the configuration remains persistent.
+1. Create an S3 bucket to store the Gold Image.
+<img width="1523" height="490" alt="image" src="https://github.com/user-attachments/assets/c0ce913f-14df-45e9-8c04-bd3c23be1de6" />
+
+2. Upload the Gold Image to the S3 bucket.
+
+3. Import the Gold Image into the target cloud.
+<img width="798" height="132" alt="image" src="https://github.com/user-attachments/assets/a3971865-bb84-4226-b228-ce6a0f12ed6b" />
+
+4. Create a VM from the image.
+5. Start the VM.
+6. Connect using the configured administrative access.
+7. Verify the security configuration.
+8. Verify the HTTP service.
+9. Verify the firewall.
+10. Reboot the cloud VM.
+11. Verify that the configuration remains persistent.
 
 ---
 
@@ -881,14 +961,8 @@ The repository should contain:
 ```text
 .
 ├── README.md
-├── docs/
-│   ├── architecture.md
-│   ├── implementation.md
-│   ├── validation.md
-│   └── screenshots/
-├── scripts/
-├── configs/
-└── challenges/
+├── VerifyVM.sh (to verify need config)
+├── scripts.md ( all commands to reproduce , from config to deployment)
 ```
 
 The exact structure may evolve during implementation.
