@@ -811,7 +811,7 @@ Cloud image import
 **Important:** The RAW image still represents the same **40 GiB virtual disk**; conversion does not change the OS, partitions, or configuration.
 
 
-```
+
 
 The Gold Image should contain the complete validated operating system
 baseline.
