@@ -607,7 +607,6 @@ The containerized HTTP service was validated by:
 * verifying the container automatically starts after reboot
 * verifying the HTTP service remains accessible after reboot
 
-````
 
 ## SELinux
 
