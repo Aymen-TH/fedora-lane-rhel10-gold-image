@@ -767,7 +767,6 @@ becomes the source for the Gold Image.
 
 The process is:
 
-```text
 RHEL 10 VM
     │
     │ configure
