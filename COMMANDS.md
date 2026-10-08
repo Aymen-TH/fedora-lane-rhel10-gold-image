@@ -281,13 +281,15 @@ podman pull registry.access.redhat.com/ubi10/httpd-24
 Create the directory that will contain the web content:
 
 ```bash
-sudo mkdir -p /opt/httpd/html
+sudo mkdir -p /opt/fedora-lane/httpd/
+
 ```
 
 Create the test page:
 
 ```bash
-sudo vi /opt/httpd/html/index.html
+sudo vi /opt/fedora-lane/httpd/index.html
+
 ```
 
 Content:
@@ -363,31 +365,36 @@ Quadlet allows Podman containers to be described as systemd-managed units.
 Create the user Quadlet directory:
 
 ```bash
-mkdir -p ~/.config/containers/systemd
+mkdir -p /etc/containers/systemd/
 ```
 
 Create the container definition:
 
 ```bash
-vi ~/.config/containers/systemd/httpd.container
+vi /etc/containers/systemd/fedora-lane-httpd.container
+
 ```
 
 The file contains:
 
 ```ini
 [Unit]
-Description=Containerized HTTPD
+Description=Fedora Lane HTTPD Container
+After=network-online.target
+Wants=network-online.target
 
 [Container]
-Image=registry.access.redhat.com/ubi10/httpd-24
-PublishPort=35443:8080
-Volume=/opt/httpd/html:/var/www/html:Z
+Image=docker.io/library/httpd:2.4
+ContainerName=fedora-lane-httpd
+PublishPort=35443:80
+Volume=/opt/fedora-lane/httpd:/usr/local/apache2/htdocs:Z
 
 [Service]
 Restart=always
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
+
 ```
 
 ---
@@ -397,7 +404,7 @@ WantedBy=default.target
 The file:
 
 ```text
-~/.config/containers/systemd/httpd.container
+/etc/containers/systemd/fedora-lane-httpd.container
 ```
 
 describes how the HTTPD container should be managed.
@@ -415,9 +422,11 @@ Provides a description for the service.
 
 ```ini
 [Container]
-Image=registry.access.redhat.com/ubi10/httpd-24
-PublishPort=35443:8080
-Volume=/opt/httpd/html:/var/www/html:Z
+Image=docker.io/library/httpd:2.4
+ContainerName=fedora-lane-httpd
+PublishPort=35443:80
+Volume=/opt/fedora-lane/httpd:/usr/local/apache2/htdocs:Z
+
 ```
 
 Defines:
@@ -440,7 +449,7 @@ Tells systemd to restart the container if it stops.
 
 ```ini
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 ```
 
 Makes the container part of the user's default systemd startup environment.
@@ -1251,6 +1260,22 @@ or:
 ```text
 SSH → port 2222 → golden user → SSH public key
 ```
+
+Got it. Continuing exactly from **#42**, with the verification script as the next step:
+
+# 43. Final Verification
+
+On the EC2 machine, run:
+
+```bash
+./verify2.sh
+```
+
+The script will verify and display the configuration we have set up, including the relevant **SSH, ports, Podman/HTTPD, and system configuration**.
+
+Use its output as the **final validation of the golden image/EC2 configuration**.
+
+If everything is correct, the project is ready for the final handoff.
 
 ```
 ```
