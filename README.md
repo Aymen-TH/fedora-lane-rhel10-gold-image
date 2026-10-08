@@ -453,99 +453,14 @@ The repository contains the main documentation and the command reproduction guid
 .
 ├── README.md
 └── COMMANDS.md
+└── verifyVM.md
 ```
 
 `README.md` explains the architecture, implementation, design decisions, and final solution.
 
 `COMMANDS.md` contains the commands required to reproduce the configuration and AWS deployment.
 
----
-
-## 20. Secrets and Credentials
-
-No secrets should be committed to the repository.
-
-This includes:
-
-* Private SSH keys
-* Passwords
-* AWS access keys
-* API tokens
-* Cloud credentials
-* Certificates containing private keys
-* Other sensitive information
-
-The private SSH key remains on the administrator's workstation and is never included in the Golden Image or GitHub repository.
-
----
-
-## 21. Documentation and Evidence
-
-Important implementation steps can be documented with screenshots.
-
-Example:
-
-```text
-docs/
-└── screenshots/
-    ├── 01-rhel10-iso.png
-    ├── 02-vm-configuration.png
-    ├── 03-filesystem-layout.png
-    ├── 04-selinux.png
-    ├── 05-ssh.png
-    ├── 06-firewall.png
-    ├── 07-httpd.png
-    ├── 08-aws-import.png
-    ├── 09-ec2.png
-    └── 10-ssm.png
-```
-
-Screenshots should focus on important technical decisions and the final working architecture.
-
----
-
-## 22. Presentation / Demonstration
-
-The final demonstration focuses on:
-
-### RHEL 10 Golden Image
-
-* Filesystem architecture
-* SELinux enforcement
-* SSH hardening
-* Administrator access
-* Firewall
-* Containerized HTTP service
-* Automatic startup verification
-* Persistence after reboot
-
-### AWS Deployment
-
-* RAW image creation
-* S3 upload
-* AMI import
-* EC2 deployment
-* Systems Manager integration
-* SSH key injection
-* SSH access on port `2222`
-* HTTP service on port `35443`
-
----
-
-## 23. Project Value
-
-The Golden Image provides Fedora Lane with a consistent and reusable RHEL foundation.
-
-The solution helps:
-
-* Standardize the server fleet
-* Reduce configuration drift
-* Improve security
-* Reduce manual configuration
-* Simplify operations
-* Improve auditability
-* Simplify troubleshooting
-* Provide a consistent foundation for cloud deployments
+`verifyVM.sh` is the script located in the golden user's home directory. It verifies whether all the system requirements are correctly configured and match the expected configuration.
 
 ---
 
