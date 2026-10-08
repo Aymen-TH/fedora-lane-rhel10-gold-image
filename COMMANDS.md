@@ -1270,7 +1270,18 @@ The script will verify and display the configuration we have set up, including t
 
 Use its output as the **final validation of the golden image/EC2 configuration**.
 
-If everything is correct, the project is ready for the final handoff.
+Verify the httpd container : 
+open a web browser and search : 3.135.65.14:35443
+
+<img width="402" height="175" alt="image" src="https://github.com/user-attachments/assets/1ecfe6d0-6d60-41ba-aac4-2d2b92c92b07" />
+
+or curl it from a cli :
+<img width="522" height="76" alt="image" src="https://github.com/user-attachments/assets/6654d408-a2e9-443b-99e3-19433e446722" />
+
+
+
+
+
 
 ```
 ```
