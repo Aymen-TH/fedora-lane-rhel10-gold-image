@@ -762,7 +762,6 @@ becomes the source for the Gold Image.
 
 The process is:
 
-```text
 RHEL 10 VM
     │
     │ configure
@@ -776,7 +775,6 @@ Validated RHEL 10 system
     │ capture / package
     ▼
 RHEL 10 Gold Image
-```
 
 ### QCOW2 → RAW conversion
 
