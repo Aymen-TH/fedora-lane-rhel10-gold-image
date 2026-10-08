@@ -1,340 +1,141 @@
+# RHEL 10 Golden Image - Fedora Lane
 
-````markdown
-# Fedora Lane - RHEL 10 Gold Image
+## 1. Project Overview
 
-## Project Overview
+This project provides a standardized and hardened **RHEL 10 Golden Image** for Fedora Lane.
 
-This project provides a secure, standardized, and operationally resilient
-RHEL 10 Gold Image for Fedora Lane's server fleet.
+The objective is to create a reusable RHEL 10 server image that can be deployed consistently in cloud environments while maintaining a predefined security, storage, networking, and service configuration.
 
-The objective is to establish a consistent operating system baseline that can
-be deployed across cloud environments such as AWS and Azure.
-
-The solution addresses Fedora Lane's challenges around:
-
-- inconsistent server environments
-- security patching and configuration drift
-- untraceable administrative changes
-- operational complexity
-- container workload operations
-- compliance and auditability
-
-The Gold Image is manually built, configured, hardened, tested, and then
-prepared for cloud deployment.
+The image is built locally, hardened and configured, converted into a cloud-compatible format, imported into AWS, and deployed as an EC2 instance.
 
 ---
 
-# Business Context
+## 2. Business Context
 
-Fedora Lane operates a hybrid and multicloud environment containing
-approximately 1,600 servers across on-premises infrastructure, AWS, Azure,
-and other locations.
+Fedora Lane operates a hybrid and cloud environment where servers need to be deployed consistently.
 
-The existing environment contains multiple Linux distributions, including
-Rocky Linux, Ubuntu, CentOS Stream, and Amazon Linux, with inconsistent
-configurations between systems.
+Without a standardized image, each server may require manual configuration, which can lead to:
 
-This creates problems with:
+* Configuration drift
+* Security inconsistencies
+* Longer deployment times
+* Repeated manual configuration
+* Difficult troubleshooting
+* Inconsistent server environments
 
-- configuration consistency
-- security updates
-- compliance
-- troubleshooting
-- operational efficiency
-- configuration drift
-- auditability
-- container workload management
-
-For example, critical security patches have failed to deploy to more than
-600 servers, while manual patching requires significant operational effort
-and can result in missed compliance deadlines.
-
-The objective of this project is therefore to provide a standardized,
-secure, and repeatable RHEL-based server foundation.
+The Golden Image provides a standardized baseline that can be reused for future deployments.
 
 ---
 
-# 1. Solution
+## 3. Solution
 
-The solution is a manually built RHEL 10 Gold Image.
+The solution is based on a hardened RHEL 10 image containing:
 
-The Gold Image provides a standardized baseline including:
-
-- standardized filesystem layout
-- SELinux enforcing
-- hardened SSH configuration
-- custom SSH port
-- controlled firewall rules
-- standardized administrative access
-- individual administrator accounts
-- sudo access requiring authentication
-- secured HTTP service
-- custom HTTP port
-- SELinux policy for custom service ports
-- persistent configuration
-- automatic service startup
-- validation after reboot
-
-The resulting system will then be captured as the Gold Image and used as the
-basis for deploying standardized servers in AWS and/or Azure.
-
-> The Gold Image is built manually rather than using the hosted Red Hat Image
-> Builder service, as required by the exercise.
-
----
-
-# 2. Architecture
-
-The overall solution follows this flow:
-
-                    Fedora Lane Requirements
-                              │
-                              ▼
-                 ┌─────────────────────────┐
-                 │   Fedora Workstation    │
-                 │       Host OS           │
-                 └────────────┬────────────┘
-                              │
-                         KVM / libvirt
-                              │
-                              ▼
-                 ┌─────────────────────────┐
-                 │       RHEL 10 VM        │
-                 │    Build Environment    │
-                 └────────────┬────────────┘
-                              │
-                    Configure + Harden
-                              │
-          ┌───────────────────┼───────────────────┐
-          │                   │                   │
-          ▼                   ▼                   ▼
-       Storage             Security            Services
-          │                   │                   │
-   /home /tmp          SELinux enforcing       httpd
-   /var/log            SSH :2222              :35443
-   /var/tmp            Firewall
-                       Users / sudo
-          │                   │                   │
-          └───────────────────┼───────────────────┘
-                              │
-                              ▼
-                 ┌─────────────────────────┐
-                 │       GOLD IMAGE        │
-                 │   Standard RHEL 10      │
-                 └────────────┬────────────┘
-                              │
-                       Capture / Package
-                              │
-                    ┌─────────┴─────────┐
-                    ▼                   ▼
-                   AWS                 Azure
-                    │                   │
-                    ▼                   ▼
-              Standardized        Standardized
-              RHEL servers        RHEL servers
-````
-
-The RHEL 10 VM is used as the build environment.
-
-The system is manually configured and hardened inside the VM. After all
-requirements have been implemented and validated, the configured RHEL system
-is captured and prepared as the Gold Image.
-
-The Gold Image can then be used to provision standardized servers.
-
----
-
-# 3. Gold Image Requirements
-
-## Operating System
-
-* RHEL 10
-* x86_64 architecture
-
-## Storage
-
-The following filesystems must be separate:
-
-* `/var/log`
-* `/home`
-* `/tmp`
-* `/var/tmp`
-
-Each of these filesystems must be smaller than 5 GiB.
-
-The root filesystem uses the remaining available disk space.
-
-## Security
-
-The Gold Image must provide:
-
+* Standardized filesystem layout
 * SELinux in enforcing mode
+* Hardened SSH configuration
+* SSH on port `2222`
+* Disabled root SSH login
+* Disabled SSH password authentication
+* Individual administrator accounts
+* Administrator group and sudo access
 * `/tmp` mounted with `noexec`
-* root SSH login disabled
-* SSH password authentication disabled
-* SSH listening on port `2222`
-* HTTP service listening on port `35443`
-* only required SSH and HTTP ports accessible through the firewall
-* individual administrator accounts
-* administrator group
-* sudo access for administrators
-* sudo must require the user's password
-* no `NOPASSWD` configuration
+* Firewalld configuration
+* Containerized HTTP service
+* HTTP service exposed on port `35443`
+* Persistent systemd/Quadlet configuration
+* Automatic startup verification
 
-## Web Server
-
-The image must contain an HTTP service.
-
-Requirements:
-
-* `httpd`
-* port `35443`
-* SELinux configured for the custom HTTP port
-* dummy `index.html`
-* service enabled at boot
-* service automatically starts after reboot
-
-The preferred implementation is to run the HTTP workload in a container.
+The image is then converted from QCOW2 to RAW and imported into AWS.
 
 ---
 
-# 4. Implementation Plan
+## 4. Architecture
 
-The implementation is divided into several phases.
+The overall workflow is:
 
 ```text
-Phase 1   Build RHEL 10 environment
-    ↓
-Phase 2   Configure filesystem layout
-    ↓
-Phase 3   Configure SELinux
-    ↓
-Phase 4   Harden SSH
-    ↓
-Phase 5   Configure administrators and sudo
-    ↓
-Phase 6   Configure HTTP service in a container
-    ↓
-Phase 7   Configure firewall
-    ↓
-Phase 8   Validate persistence and services
-    ↓
-Phase 9   Reboot and validate
-    ↓
-Phase 10  Capture Gold Image
-    ↓
-Phase 11  Deploy to AWS / Azure
-    ↓
-Phase 12  Cloud validation
+                    Fedora Workstation
+                           │
+                           │ KVM / libvirt
+                           ▼
+                  ┌───────────────────┐
+                  │    RHEL 10 VM     │
+                  │                   │
+                  │ Hardened baseline │
+                  │ SELinux           │
+                  │ SSH :2222         │
+                  │ HTTP :35443       │
+                  │ Firewall          │
+                  │ Podman            │
+                  └─────────┬─────────┘
+                            │
+                            │ QCOW2 → RAW
+                            ▼
+                     ┌──────────────┐
+                     │   RAW Image  │
+                     └──────┬───────┘
+                            │
+                            │ Upload
+                            ▼
+                    ┌────────────────┐
+                    │   Amazon S3    │
+                    └───────┬────────┘
+                            │
+                            │ Import
+                            ▼
+                     ┌──────────────┐
+                     │   AWS AMI    │
+                     └──────┬───────┘
+                            │
+                            │ Launch
+                            ▼
+                     ┌──────────────┐
+                     │ EC2 Instance │
+                     │              │
+                     │ RHEL 10      │
+                     │ SSH :2222    │
+                     │ HTTP :35443  │
+                     └──────┬───────┘
+                            │
+                     AWS Systems Manager
+                       Session Manager
+                            │
+                            ▼
+                     Administrative Access
 ```
 
 ---
 
-# 5. Phase 1 - Build Environment
+## 5. Gold Image Requirements
 
-## 5.1 Download RHEL 10 Installation Media
+### Operating System
 
-The RHEL 10 x86_64 DVD ISO was downloaded from the Red Hat Customer Portal.
-
-The ISO is used as the installation media for the RHEL 10 virtual machine.
-
-It is important to distinguish between the installation ISO and the final
-Gold Image:
+The image is based on:
 
 ```text
-RHEL 10 DVD ISO
-      │
-      │ installation media
-      ▼
-RHEL 10 VM
-      │
-      │ configure + harden + test
-      ▼
-RHEL 10 Gold Image
-      │
-      ├── AWS
-      └── Azure
+RHEL 10
+x86_64
 ```
 
-The approximately 8 GB ISO is **not** the Gold Image that will be uploaded
-to AWS or Azure.
+The build VM uses:
+
+| Setting        | Value   |
+| -------------- | ------- |
+| Host OS        | Fedora  |
+| Hypervisor     | KVM     |
+| Virtualization | libvirt |
+| Guest OS       | RHEL 10 |
+| Architecture   | x86_64  |
+| RAM            | 4 GiB   |
+| vCPUs          | 2       |
+| Virtual Disk   | 40 GiB  |
 
 ---
 
-## 5.2 Create the RHEL 10 Build VM
+## 6. Filesystem Layout
 
-The RHEL 10 build environment was created on the Fedora workstation using
-KVM/libvirt.
-
-The VM is named:
-
-```text
-rhel10.0-GOLDEN
-```
-
-### VM Configuration
-
-| Setting            | Value                  |
-| ------------------ | ---------------------- |
-| VM name            | `rhel10.0-GOLDEN`      |
-| Host OS            | Fedora                 |
-| Hypervisor         | KVM                    |
-| Virtualization     | libvirt                |
-| Guest OS           | RHEL 10                |
-| Architecture       | x86_64                 |
-| RAM                | 4 GiB                  |
-| vCPUs              | 2                      |
-| Virtual disk       | 40 GiB                 |
-| Installation media | RHEL 10 x86_64 DVD ISO |
-| Network            | libvirt default/NAT    |
-
-The VM provides an isolated environment where the RHEL system can be built,
-configured, hardened, and tested before being captured as the Gold Image.
-
-
----
-
-## 5.3 RHEL Installation
-
-RHEL 10 was installed normally inside the virtual machine.
-
-During installation, the virtual disk was configured manually so that the
-required filesystems are separated.
-
-The installation disk is:
-
-```text
-/dev/vda
-```
-
-with a total size of approximately:
-
-```text
-40 GiB
-```
-
-The installation uses the **Custom** storage configuration.
-
-### Required filesystem layout
-
-```text
-/
-├── /home
-├── /tmp
-├── /var/log
-└── /var/tmp
-```
-
-The required dedicated filesystems are kept below 5 GiB.
-
-The remaining disk space is used for the root filesystem and the other
-required system partitions.
-
----
-
-# 6. Phase 2 - Filesystem Configuration
-
-The Gold Image must have dedicated filesystems for:
+The following filesystems were configured separately during the RHEL installation using custom storage configuration:
 
 ```text
 /home
@@ -343,672 +144,344 @@ The Gold Image must have dedicated filesystems for:
 /var/tmp
 ```
 
-Each filesystem must remain below 5 GiB.
+Each required filesystem is configured below 5 GiB.
 
-The purpose of this layout is to isolate important areas of the operating
-system and reduce the impact of uncontrolled filesystem growth.
+The remaining disk space is allocated to the root filesystem.
 
-For example:
+`/tmp` is also configured with the `noexec` mount option.
 
-* `/var/log` is isolated so that excessive logs do not consume the root
-  filesystem.
-* `/home` is isolated from system files.
-* `/tmp` is isolated for temporary files.
-* `/var/tmp` is isolated for persistent temporary data.
-
-The filesystem configuration will be verified after installation using
-standard Linux storage and mount commands.
-
-### Validation
-
-The final configuration will be checked using:
-
-```bash
-lsblk
-df -h
-findmnt
-```
-
-The configuration must also remain correct after reboot.
+This storage layout provides better separation between system data, user data, logs, and temporary files.
 
 ---
 
-# 7. Phase 3 - SELinux
+## 7. Security Configuration
 
-SELinux is a core security requirement of the Gold Image.
+### SELinux
 
-The final system must have:
+SELinux remains enabled and enforcing.
 
-```text
-SELinux = enforcing
-```
-
-SELinux will also be configured to allow the custom service ports:
+The custom services require SELinux port labeling for:
 
 ```text
-SSH  = 2222
-HTTP = 35443
+SSH   → 2222/tcp
+HTTP  → 35443/tcp
 ```
 
-The appropriate SELinux port contexts will be configured rather than
-disabling SELinux or using permissive mode.
-
-### Validation
-
-The final system will be checked with:
-
-```bash
-getenforce
-```
-
-Expected result:
-
-```text
-Enforcing
-```
-
-SELinux port configuration will also be verified.
+This allows the services to operate on non-default ports while maintaining SELinux protection.
 
 ---
 
-# 8. Phase 4 - SSH Hardening
+## 8. SSH Hardening
 
-SSH is required for remote administration but must be hardened.
-
-The SSH configuration will use:
+SSH is configured to listen on:
 
 ```text
+2222/tcp
+```
+
+The following hardening settings are applied:
+
+```text
+PermitRootLogin no
+PasswordAuthentication no
 Port 2222
 ```
 
-The following security requirements will be implemented:
+This means:
 
-* SSH uses port `2222`
-* root SSH login is disabled
-* SSH password authentication is disabled
-* administrators authenticate using their individual accounts
-* SELinux allows SSH on port `2222`
-* the firewall allows SSH on port `2222`
-
-The SSH service must also start automatically after reboot.
-
-### Validation
-
-The configuration will be checked before reboot and again after reboot.
-
-Examples of validation include:
-
-```bash
-ss -lnt
-systemctl status sshd
-```
-
-The final system must show SSH listening on:
-
-```text
-2222
-```
+* Root cannot log in directly through SSH.
+* Password-based SSH authentication is disabled.
+* SSH uses the custom port `2222`.
+* Authentication is performed using SSH keys.
 
 ---
 
-# 9. Phase 5 - Administrative Access and sudo
+## 9. Administrator Access
 
-Administrators must use individual accounts instead of sharing the root
-account.
+Individual administrator accounts are created instead of using the root account directly.
 
-An administrative group will be created and administrator accounts will be
-added to that group.
-
-The administrators will receive sudo access to perform privileged
-operations.
-
-Sudo must require authentication.
-
-The configuration must **not** contain:
+Administrators belong to a dedicated group:
 
 ```text
-NOPASSWD
+administrators
 ```
 
-The goal is to provide:
+The group receives sudo access.
 
-```text
-Individual user
-      │
-      ▼
-Administrator group
-      │
-      ▼
-sudo
-      │
-      ▼
-root privileges
-```
+Sudo requires the administrator's password.
 
-This provides individual accountability while still allowing administrators
-to perform required system administration tasks.
+No `NOPASSWD` configuration is used.
 
 ---
 
-# 10. Phase 6 - HTTP Service
+## 10. Containerized HTTP Service
 
-## Containerized HTTP Service
+The image provides a simple HTTP service using Podman.
 
-The HTTP workload is implemented using **Podman** rather than running the
-`httpd` service directly on the RHEL host.
+The workload runs inside an Apache HTTPD container.
 
-The architecture is:
-
-Client
-   │
-   │ TCP 35443
-   ▼
-RHEL 10 Host
-   │
-   │ Podman port mapping
-   │ 35443 → 80
-   ▼
-httpd Container
-   │
-   │ Apache HTTP Server :80
-   ▼
-index.html
-````
-
-The host exposes port `35443`, while Apache listens on its standard HTTP port
-`80` inside the container.
-
-The containerized implementation provides:
-
-* Apache HTTP Server running inside a Podman container
-* Host port `35443` mapped to container port `80`
-* Persistent web content stored outside the container
-* SELinux-compatible container volume labeling
-* Firewall access limited to the required HTTP port
-* Automatic container startup after reboot
-
-### Container Configuration
-
-The HTTP workload was configured using Podman.
-
-The implementation consists of the following steps:
-
-1. Create a dedicated directory on the RHEL host for the HTTP content.
-2. Create a basic `index.html` file in this directory.
-3. Apply the appropriate SELinux container file context to the directory.
-4. Create the `httpd` container from the official Apache HTTP image.
-5. Mount the host content directory into the Apache document root.
-6. Map host port `35443` to port `80` inside the container.
-7. Verify that the container is running and that the HTTP page is accessible.
-8. Verify that the firewall allows TCP port `35443`.
-
-### Container Persistence
-
-A manually started container would not be sufficient for the Gold Image because
-the HTTP service must automatically return after a reboot.
-
-Podman **Quadlet** was therefore used to integrate the container with
-`systemd`.
-
-The persistence configuration consists of the following steps:
-
-1. Create a Podman Quadlet configuration for the HTTP container.
-2. Define the container image, container name, port mapping, and persistent
-   volume in the Quadlet configuration.
-3. Configure the container to restart automatically .
-4. Integrate the container with the system boot process through the generated
-   `systemd` service.
-5. Reboot the RHEL VM.
-6. Verify that the container is automatically recreated/started.
-7. Verify that the HTTP service is still accessible on port `35443`.
-
-This ensures that the Gold Image does not depend on manually starting the
-container after every reboot.
-
-### Persistence Architecture
+The service is exposed through:
 
 ```text
-                    RHEL 10 Gold Image
-                           │
-             ┌─────────────┴─────────────┐
-             │                           │
-      Quadlet configuration       Persistent content
-             │                           │
-             ▼                           ▼
-        systemd service          /opt/fedora-lane/httpd locally mounted on /usr/local/apache2/htdocs 
-             │                           │
-             └─────────────┬─────────────┘
-                           ▼
-                    Podman container
-                           │
-                    httpd :80
-                           │
-                    Host :35443
+35443 → 80
 ```
 
-The container itself is treated as a replaceable workload, while the web
-content is maintained on the host through the persistent volume.
+The container serves a simple page:
 
-### Validation
+```text
+Fedora Lane - httpd is working in a container!
+```
 
-The containerized HTTP service was validated by:
+The container is managed through **Podman Quadlet/systemd**, allowing it to start automatically when the system boots.
 
-* verifying the Podman container is running
-* verifying port `35443` is exposed
-* verifying the test `index.html` is returned
-* verifying SELinux remains enforcing
-* verifying the firewall allows port `35443`
-* rebooting the VM
-* verifying the container automatically starts after reboot
-* verifying the HTTP service remains accessible after reboot
+---
 
+## 11. Firewall
 
-## SELinux
-
-Because `35443` is not the standard HTTP port, SELinux must be configured
-to allow `httpd` to use this port.
-
-SELinux will remain enforcing.
-
-
-# 11. Phase 7 - Firewall
-
-The firewall will be configured so that only the required application and
-administration ports are accessible.
+Firewalld is configured to allow only the required application ports.
 
 Required ports:
 
 ```text
-SSH   → 2222
-HTTP  → 35443
+2222/tcp   → SSH
+35443/tcp  → HTTP
 ```
 
-Other unnecessary inbound ports must remain closed.
-
-The firewall configuration must be persistent.
-
-### Validation
-
-The final firewall configuration will be checked before and after reboot.
-
-The objective is:
-
-```text
-Internet / Network
-       │
-       ├──── TCP 2222  → SSH
-       │
-       └──── TCP 35443 → HTTP
-       
-       Other inbound ports → blocked
-```
+Other unnecessary inbound ports remain blocked.
 
 ---
 
-# 12. Phase 8 - Persistence and Service Configuration
+## 12. Automatic Startup Verification
 
-All required configuration must survive a reboot.
+The Gold Image contains a verification script used to verify the expected configuration.
 
-This includes:
+The verification script is configured to run automatically when the machine starts.
 
-* filesystem mounts
-* `/tmp` `noexec`
-* SELinux enforcing mode
-* SELinux port configuration
-* SSH port `2222`
-* SSH hardening
-* firewall rules
-* administrator accounts
-* sudo configuration
-* HTTP port `35443`
-* HTTP service configuration
-* service enablement
+Its purpose is to verify that the important Gold Image requirements remain correctly configured after boot, including:
 
-Services that are required at boot will be enabled using systemd.
+* Filesystem configuration
+* SELinux
+* SSH configuration
+* Administrator access
+* Firewall
+* HTTP service
+* Required services
+* Persistence after reboot
 
-The system must not depend on manually starting services after every reboot.
+This avoids relying on manual validation after every startup.
 
 ---
 
-# 13. Phase 9 - Validation
+## 13. Gold Image Creation
 
-Before creating the Gold Image, the entire system will be validated throught a script that will validate :
-
-## Storage
-
-Verify:
-
-```bash
-lsblk
-df -h
-findmnt
-```
-
-Check that:
-
-```text
-/home
-/tmp
-/var/log
-/var/tmp
-```
-
-are separate filesystems and each is below 5 GiB.
-
-## SELinux
-
-Verify:
-
-```bash
-getenforce
-```
-
-Expected:
-
-```text
-Enforcing
-```
-
-## SSH
-
-Verify:
-
-```text
-Port = 2222
-Root login = disabled
-Password authentication = disabled
-```
-
-## HTTP
-
-Verify:
-
-```text
-httpd
-Port = 35443
-index.html = available
-```
-
-## Firewall
-
-Verify:
-
-```text
-2222  → allowed
-35443 → allowed
-Other unnecessary inbound ports → blocked
-```
-
-## Services
-
-Verify required services are enabled and running.
-
-## Reboot Test
-
-The VM will then be rebooted.
-
-After reboot, the same requirements will be checked again.
-
-This is important because the Gold Image must represent a system that is
-operationally resilient and does not require manual reconfiguration after
-restarting.
-
----
-
-# 14. Phase 10 - Gold Image Creation
-
-Once the RHEL 10 VM has been fully configured and validated, the system
-becomes the source for the Gold Image.
-
-The process is:
-
-RHEL 10 VM
-    │
-    │ configure
-    │ harden
-    │ test
-    │ reboot
-    │ validate
-    ▼
-Validated RHEL 10 system
-    │
-    │ capture / package
-    ▼
-RHEL 10 Gold Image
-
-### QCOW2 → RAW conversion
-
-The VM was originally stored as a **QCOW2** disk image, which is optimized for virtualization and supports features such as snapshots, compression, and thin provisioning :
-<img width="865" height="343" alt="image" src="https://github.com/user-attachments/assets/36b4bed8-ad1b-4df9-9db3-8332b5d4e904" />
-
-For cloud deployment, we converted the image to **RAW**, a simple sector-by-sector disk representation that is more widely supported by cloud image-import tools :
-
-<img width="2086" height="775" alt="image" src="https://github.com/user-attachments/assets/16f0bd25-067f-4c87-9f78-fe28e4e73618" />
-
-
-```text
-QCOW2
-  │
-  │ qemu-img convert
-  ▼
-RAW
-  │
-  ▼
-Cloud image import
-```
-
-
-* **QCOW2:** virtualization-friendly format used by KVM/QEMU.
-* **RAW:** simple representation of the VM's virtual disk, without QCOW2-specific features.
-* **Why convert?** The goal is to package the validated VM disk in a format suitable for the target cloud's image-import process.
-
-**Important:** The RAW image still represents the same **40 GiB virtual disk**; conversion does not change the OS, partitions, or configuration.
-
-
-
-
-The Gold Image should contain the complete validated operating system
-baseline.
-
-The installation ISO itself is not uploaded as the Gold Image.
-
-A proper cloud-compatible image/capture process will be used for the target
-cloud platform.
-
-
----
-
-# 15. Phase 11 - Cloud Deployment
-
-The Gold Image will be prepared for deployment to AWS and/or Azure.
-
-The deployment process will include:
-
-1. Create an S3 bucket to store the Gold Image.
-<img width="1523" height="490" alt="image" src="https://github.com/user-attachments/assets/c0ce913f-14df-45e9-8c04-bd3c23be1de6" />
-
-2. Upload the Gold Image to the S3 bucket.
-
-3. Import the Gold Image into the target cloud.
-<img width="798" height="132" alt="image" src="https://github.com/user-attachments/assets/a3971865-bb84-4226-b228-ce6a0f12ed6b" />
-
-4. Create a VM from the image.
-5. Start the VM.
-6. Connect using the configured administrative access.
-7. Verify the security configuration.
-8. Verify the HTTP service.
-9. Verify the firewall.
-10. Reboot the cloud VM.
-11. Verify that the configuration remains persistent.
-
----
-
-# 16. AWS Deployment
-
-The first cloud deployment target can be AWS.
+Once the RHEL 10 VM has been configured and hardened, the VM becomes the source for the Golden Image.
 
 The workflow is:
 
 ```text
-RHEL 10 Gold Image
+RHEL 10 VM
+    │
+    │ Configure
+    │ Harden
+    │ Verify
+    ▼
+RHEL 10 Golden VM
+    │
+    │ Shutdown
+    ▼
+QCOW2 image
+    │
+    │ qemu-img convert
+    ▼
+RAW image
+```
+
+The original virtualization disk is stored as QCOW2.
+
+For AWS deployment, the image is converted to RAW.
+
+---
+
+## 14. QCOW2 → RAW Conversion
+
+The original RHEL disk was stored as:
+
+```text
+rhel10.06-GOLDEN.qcow2
+```
+
+The image was converted to:
+
+```text
+golden-aws.raw
+```
+
+The RAW image represents the complete RHEL disk and is used as the source for the AWS image import.
+
+---
+
+## 15. AWS Deployment
+
+The RAW image is uploaded to an Amazon S3 bucket.
+
+The deployment workflow is:
+
+```text
+RHEL 10 Golden VM
         │
         ▼
-    AWS Image
+      QCOW2
+        │
+        ▼
+       RAW
+        │
+        ▼
+       S3
+        │
+        ▼
+   AWS Import
+        │
+        ▼
+       AMI
         │
         ▼
    EC2 Instance
-        │
-        ▼
-Validate configuration
 ```
 
-The deployed system must retain the Gold Image baseline.
-
-Validation will include:
-
-* RHEL version
-* filesystem layout
-* SELinux
-* SSH configuration
-* administrator access
-* firewall
-* HTTP service
-* persistence after reboot
-
----
-
-# 17. Azure Deployment
-
-Azure is the second possible deployment target.
-
-If implemented, the workflow is:
+The AWS deployment was performed in:
 
 ```text
-RHEL 10 Gold Image
-        │
-        ▼
-   Azure Image
-        │
-        ▼
-   Azure VM
-        │
-        ▼
-Validate configuration
+Region:
+us-east-2
 ```
 
-This is considered a stretch goal if AWS is completed first.
-
----
-
-# 18. Optional Stretch Goals
-
-## Stretch Goal 1 - Security Compliance
-
-Evaluate the Gold Image using OpenSCAP and/or a relevant CIS security
-profile.
-
-The objective is to demonstrate that the standardized image can also be
-assessed against a recognized security baseline.
-
-Possible workflow:
+The resulting AMI:
 
 ```text
-Gold Image
-    │
-    ▼
-OpenSCAP / CIS assessment
-    │
-    ▼
-Identify findings
-    │
-    ▼
-Remediate applicable findings
-    │
-    ▼
-Re-test
+ami-0aaf17a10931aa55d
 ```
 
----
-
-## Stretch Goal 2 - Multi-Cloud Images
-
-Create validated deployment images for both:
+The deployed EC2 instance:
 
 ```text
-AWS
-Azure
+i-09460381bdb622f7d
 ```
-
-This demonstrates the portability of the standardized RHEL baseline across
-the customer's multicloud environment.
 
 ---
 
-# 19. GitHub Repository
+## 16. AWS Systems Manager
 
-The project source code and documentation will be maintained in GitHub.
+AWS Systems Manager Session Manager is used as the initial administrative access mechanism.
 
-The repository should contain:
+The EC2 instance is associated with:
+
+```text
+Golden-EC2-SSM-Role
+```
+
+The role uses:
+
+```text
+AmazonSSMManagedInstanceCore
+```
+
+The corresponding instance profile is:
+
+```text
+Golden-EC2-SSM-Profile
+```
+
+This allows the instance to register with Systems Manager and provides shell access without requiring SSH to be available during the initial bootstrap phase.
+
+---
+
+## 17. SSH Key Management
+
+User-specific SSH private keys are **not baked into the Golden Image**.
+
+Instead, the SSH key is generated manually on the administrator's workstation.
+
+The public key is then injected into the deployed EC2 instance through AWS Systems Manager.
+
+The workflow is:
+
+```text
+Administrator PC
+      │
+      │ ssh-keygen
+      ▼
+Private key + Public key
+      │
+      │ SSM SendCommand
+      ▼
+EC2 instance
+      │
+      │ authorized_keys
+      ▼
+SSH :2222
+```
+
+The private key remains on the administrator's workstation.
+
+This keeps user-specific credentials outside the Golden Image.
+
+---
+
+## 18. SSH Access
+
+After the public key has been injected into the appropriate administrator account, SSH access is performed through port `2222`.
+
+Example:
+
+```bash
+ssh -i ~/.ssh/golden-aws -p 2222 golden@<EC2_PUBLIC_IP>
+```
+
+The AWS Security Group and the RHEL firewall both allow:
+
+```text
+TCP 2222
+```
+
+---
+
+## 19. Repository Structure
+
+The repository contains the main documentation and the command reproduction guide.
 
 ```text
 .
 ├── README.md
-├── VerifyVM.sh (to verify need config)
-├── scripts.md ( all commands to reproduce , from config to deployment)
+└── COMMANDS.md
 ```
 
-The exact structure may evolve during implementation.
+`README.md` explains the architecture, implementation, design decisions, and final solution.
 
-## Repository Requirements
-
-The repository should:
-
-* document the purpose of the project
-* explain the implementation
-* document important technical decisions
-* provide setup and execution instructions
-* document deployment requirements
-* contain relevant configuration/scripts
-* contain screenshots or other evidence where useful
-* document challenges and solutions
-
-The repository should remain private if possible.
-
-The required Red Hat reviewer:
-
-```text
-mflaim-eng
-```
-
-should be added as appropriate.
+`COMMANDS.md` contains the commands required to reproduce the configuration and AWS deployment.
 
 ---
 
-# 20. Secrets and Credentials
+## 20. Secrets and Credentials
 
 No secrets should be committed to the repository.
 
 This includes:
 
-* passwords
-* private SSH keys
-* cloud credentials
+* Private SSH keys
+* Passwords
+* AWS access keys
 * API tokens
-* access keys
-* certificates containing private keys
-* other sensitive information
+* Cloud credentials
+* Certificates containing private keys
+* Other sensitive information
 
-Any required credentials should be provided separately during deployment.
-
-If available, `rh-pre-commit` should be used to help prevent accidental
-secret commits.
+The private SSH key remains on the administrator's workstation and is never included in the Golden Image or GitHub repository.
 
 ---
 
-# 21. Documentation and Evidence
+## 21. Documentation and Evidence
 
-Important implementation steps will be documented with screenshots and
-configuration evidence.
+Important implementation steps can be documented with screenshots.
 
 Example:
 
@@ -1017,208 +490,103 @@ docs/
 └── screenshots/
     ├── 01-rhel10-iso.png
     ├── 02-vm-configuration.png
-    ├── 03-installation-destination.png
-    ├── 04-filesystem-layout.png
-    ├── 05-selinux.png
-    ├── 06-ssh.png
-    ├── 07-firewall.png
-    ├── 08-httpd.png
-    ├── 09-validation.png
-    └── 10-cloud-deployment.png
+    ├── 03-filesystem-layout.png
+    ├── 04-selinux.png
+    ├── 05-ssh.png
+    ├── 06-firewall.png
+    ├── 07-httpd.png
+    ├── 08-aws-import.png
+    ├── 09-ec2.png
+    └── 10-ssm.png
 ```
 
-Screenshots should demonstrate important technical decisions and successful
-validation rather than documenting every individual command.
+Screenshots should focus on important technical decisions and the final working architecture.
 
 ---
 
-# 22. Presentation / Demonstration
+## 22. Presentation / Demonstration
 
-The final solution will be demonstrated in a short presentation.
+The final demonstration focuses on:
 
-The presentation should focus on:
+### RHEL 10 Golden Image
 
-## Opening
-
-Explain:
-
-* Fedora Lane's environment
-* the operational problems
-* why standardization is required
-
-## Live Walkthrough
-
-Demonstrate:
-
-* RHEL 10 Gold Image architecture
-* filesystem layout
+* Filesystem architecture
 * SELinux enforcement
 * SSH hardening
-* administrator access
-* firewall
-* HTTP service
-* persistence after reboot
-* cloud deployment
+* Administrator access
+* Firewall
+* Containerized HTTP service
+* Automatic startup verification
+* Persistence after reboot
 
-The walkthrough should explain the important technical decisions rather
-than showing every command used during implementation.
+### AWS Deployment
 
-## Value
-
-Explain how the solution helps Fedora Lane:
-
-* standardize the server fleet
-* reduce configuration drift
-* simplify operations
-* improve security
-* improve auditability
-* simplify troubleshooting
-* provide a consistent foundation for cloud deployments
+* RAW image creation
+* S3 upload
+* AMI import
+* EC2 deployment
+* Systems Manager integration
+* SSH key injection
+* SSH access on port `2222`
+* HTTP service on port `35443`
 
 ---
 
-# 23. Validation Checklist
+## 23. Project Value
 
-Before considering the Gold Image complete, verify:
+The Golden Image provides Fedora Lane with a consistent and reusable RHEL foundation.
 
-## Operating System
+The solution helps:
 
-* [ ] RHEL 10 installed
-* [ ] x86_64 architecture
-* [ ] Gold Image build environment documented
-
-## Storage
-
-* [ ] `/home` is a separate filesystem
-* [ ] `/tmp` is a separate filesystem
-* [ ] `/var/log` is a separate filesystem
-* [ ] `/var/tmp` is a separate filesystem
-* [ ] Each required filesystem is below 5 GiB
-* [ ] Filesystems persist after reboot
-
-## Security
-
-* [ ] SELinux is enforcing
-* [ ] `/tmp` uses `noexec`
-* [ ] SELinux allows SSH on port `2222`
-* [ ] SELinux allows HTTP on port `35443`
-* [ ] Root SSH login is disabled
-* [ ] SSH password authentication is disabled
-* [ ] Individual administrator accounts exist
-* [ ] Administrators belong to the correct group
-* [ ] sudo access works
-* [ ] sudo requires a password
-* [ ] No `NOPASSWD` configuration exists
-
-## SSH
-
-* [ ] SSH listens on `2222`
-* [ ] SSH starts automatically
-* [ ] SSH works after reboot
-
-## HTTP
-
-* [ ] `httpd` is installed/configured
-* [ ] HTTP listens on `35443`
-* [ ] `index.html` exists
-* [ ] HTTP starts automatically
-* [ ] HTTP works after reboot
-
-## Firewall
-
-* [ ] TCP `2222` allowed
-* [ ] TCP `35443` allowed
-* [ ] Unnecessary inbound ports blocked
-* [ ] Firewall configuration persists after reboot
-
-## Gold Image
-
-* [ ] Full system configuration validated
-* [ ] System reboot tested
-* [ ] Configuration survives reboot
-* [ ] Gold Image captured
-* [ ] Gold Image prepared for cloud deployment
-
-## Cloud
-
-* [ ] Gold Image deployed to AWS and/or Azure
-* [ ] Cloud VM starts successfully
-* [ ] SSH access validated
-* [ ] HTTP access validated
-* [ ] Security configuration validated
-* [ ] Reboot persistence validated
-
-## Optional
-
-* [ ] OpenSCAP/CIS assessment
-* [ ] AWS image
-* [ ] Azure image
+* Standardize the server fleet
+* Reduce configuration drift
+* Improve security
+* Reduce manual configuration
+* Simplify operations
+* Improve auditability
+* Simplify troubleshooting
+* Provide a consistent foundation for cloud deployments
 
 ---
 
-# 24. Current Project Status
+## 24. Final Architecture
 
-### Phase 1 - Build Environment
-
-* [x] RHEL 10 x86_64 ISO downloaded
-* [x] KVM/libvirt environment prepared
-* [x] RHEL 10 VM created
-* [x] VM configured with 4 GiB RAM
-* [x] VM configured with 2 vCPUs
-* [x] 40 GiB virtual disk created
-* [x] RHEL 10 installation started
-* [x] Custom storage configuration selected
-
-### Remaining
-
-* [ ] Complete filesystem configuration
-* [ ] Complete RHEL 10 installation
-* [ ] Configure SELinux
-* [ ] Configure `/tmp` with `noexec`
-* [ ] Harden SSH
-* [ ] Configure administrator accounts
-* [ ] Configure sudo
-* [ ] Configure HTTP service
-* [ ] Configure SELinux service ports
-* [ ] Configure firewall
-* [ ] Enable required services
-* [ ] Validate configuration
-* [ ] Reboot and revalidate
-* [ ] Capture Gold Image
-* [ ] Deploy to AWS and/or Azure
-* [ ] Perform cloud validation
-* [ ] Complete documentation
-* [ ] Prepare final presentation
-
----
-
-# 25. Expected Final Result
-
-The final result should be a validated RHEL 10 Gold Image that provides a
-standardized and secure foundation for Fedora Lane's server fleet.
+The final solution can be summarized as:
 
 ```text
-                 Fedora Lane
-                      │
-                      ▼
-              RHEL 10 Gold Image
-                      │
-       ┌──────────────┼──────────────┐
-       │              │              │
-       ▼              ▼              ▼
-   Standard       Secure          Auditable
-   Storage        Access          Operations
-       │              │              │
-       └──────────────┼──────────────┘
-                      │
-                      ▼
-               Cloud Deployment
-                 ┌────┴────┐
-                 ▼         ▼
-                AWS      Azure
+                     RHEL 10 Golden Image
+                              │
+                 ┌────────────┴────────────┐
+                 │                         │
+            Security                 Application
+                 │                         │
+        SELinux Enforcing            Podman HTTPD
+        SSH :2222                    HTTP :35443
+        Firewall                     Quadlet
+        Admin + sudo
+        /tmp noexec
+                 │                         │
+                 └────────────┬────────────┘
+                              │
+                         QCOW2 → RAW
+                              │
+                              ▼
+                         Amazon S3
+                              │
+                              ▼
+                           AWS AMI
+                              │
+                              ▼
+                         EC2 Instance
+                              │
+                    ┌─────────┴─────────┐
+                    │                   │
+                  SSM                  SSH
+              Management            Port 2222
+                    │                   │
+                    └─────────┬─────────┘
+                              │
+                       RHEL 10 Server
 ```
 
-The Gold Image provides a repeatable baseline that can help Fedora Lane
-reduce configuration drift, simplify server operations, improve security,
-and establish a consistent foundation for future cloud workloads.
-
+The result is a reusable, hardened RHEL 10 Golden Image that can be deployed consistently into AWS while keeping user-specific credentials outside the image.
