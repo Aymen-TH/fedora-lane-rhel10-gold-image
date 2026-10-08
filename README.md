@@ -1,4 +1,3 @@
-Absolutely — here is the **full updated README**, keeping your existing structure but making it more complete, professional, and aligned with the Fedora Lane assignment and what we have actually done so far.
 
 ````markdown
 # Fedora Lane - RHEL 10 Gold Image
@@ -88,7 +87,6 @@ basis for deploying standardized servers in AWS and/or Azure.
 
 The overall solution follows this flow:
 
-```text
                     Fedora Lane Requirements
                               │
                               ▼
@@ -196,8 +194,7 @@ Requirements:
 * service enabled at boot
 * service automatically starts after reboot
 
-The preferred implementation is to run the HTTP workload in a container
-where practical.
+The preferred implementation is to run the HTTP workload in a container.
 
 ---
 
@@ -216,7 +213,7 @@ Phase 4   Harden SSH
     ↓
 Phase 5   Configure administrators and sudo
     ↓
-Phase 6   Configure HTTP service
+Phase 6   Configure HTTP service in a container
     ↓
 Phase 7   Configure firewall
     ↓
@@ -495,7 +492,6 @@ to perform required system administration tasks.
 
 # 10. Phase 6 - HTTP Service
 
-````markdown
 ## Containerized HTTP Service
 
 The HTTP workload is implemented using **Podman** rather than running the
@@ -503,7 +499,6 @@ The HTTP workload is implemented using **Podman** rather than running the
 
 The architecture is:
 
-```text
 Client
    │
    │ TCP 35443
@@ -767,6 +762,7 @@ becomes the source for the Gold Image.
 
 The process is:
 
+```text
 RHEL 10 VM
     │
     │ configure
@@ -780,7 +776,7 @@ Validated RHEL 10 system
     │ capture / package
     ▼
 RHEL 10 Gold Image
-
+```
 
 ### QCOW2 → RAW conversion
 
