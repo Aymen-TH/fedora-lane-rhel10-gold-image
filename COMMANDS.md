@@ -1,8 +1,3 @@
-Absolutely. The better structure is **chronological**: first everything configured *inside the RHEL golden VM*, then the image conversion/upload, then AWS import/AMI/EC2, and finally SSM + SSH access.
-
-````markdown
-# COMMANDS.md
-
 # RHEL 10 Golden Image — Reproduction Runbook
 
 This document describes the complete workflow used to build the RHEL 10 golden image, prepare it for AWS, import it, create an EC2 instance, and configure remote administration.
