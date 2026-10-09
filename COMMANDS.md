@@ -1120,7 +1120,7 @@ Connect from the PC:
 
 ```bash
 ssh \
-  -i ~/.ssh/GOLDEN-keypair \
+  -i /path_to/GOLDEN-keypair \
   -p 2222 \
   golden@<EC2_PUBLIC_IP>
 ```
@@ -1128,10 +1128,9 @@ ssh \
 Example:
 
 ```bash
-ssh \
   -i ~/.ssh/GOLDEN-keypair \
   -p 2222 \
-  golden@3.145.128.197
+  golden@3.145.128.XXX
 ```
 
 ---
