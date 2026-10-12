@@ -1129,7 +1129,7 @@ Example:
 
 ```bash
 ssh -i /root/GOLDEN-keypair.pem \
-    -p 2222 golden@3.21.233.179
+    -p 2222 golden@<EC2_PUBLIC_IP>
 ```
 
 ---
