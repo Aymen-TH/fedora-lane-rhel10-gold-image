@@ -1284,6 +1284,216 @@ or curl it from a cli :
 
 
 
+---
+STRETCH OBJECTIVE :
+
+# 44. Install OpenSCAP and Security Content
+
+Install the scanner and the RHEL security content:
+
+```bash
+sudo dnf install -y openscap-scanner scap-security-guide
+```
+
+Check that the RHEL 10 data stream exists:
+
+```bash
+ls -lh /usr/share/xml/scap/ssg/content/ssg-rhel10-ds.xml
+```
+
+List available profiles:
+
+```bash
+sudo oscap info /usr/share/xml/scap/ssg/content/ssg-rhel10-ds.xml
+```
+
+Selected profile:
+
+```text
+xccdf_org.ssgproject.content_profile_cis_server_l1
+```
+
+---
+
+# 45. Run the Initial CIS Assessment
+
+Create a directory for the reports:
+
+```bash
+mkdir -p ~/openscap-report
+cd ~/openscap-report
+```
+
+Run the assessment:
+
+```bash
+sudo oscap xccdf eval \
+  --profile xccdf_org.ssgproject.content_profile_cis_server_l1 \
+  --results cis-results.xml \
+  --report cis-report.html \
+  /usr/share/xml/scap/ssg/content/ssg-rhel10-ds.xml
+```
+
+The command generates:
+
+```text
+cis-results.xml
+cis-report.html
+```
+
+The HTML report can be opened in a browser. The XML file contains the structured assessment results.
+
+---
+
+# 46. Improvement 1 — Enable Sudo Command Logging
+
+Create the sudo logging configuration:
+
+```bash
+echo 'Defaults logfile="/var/log/sudo.log"' \
+  | sudo tee /etc/sudoers.d/99-sudo-log
+```
+
+Set the correct permissions and validate the configuration:
+
+```bash
+sudo chmod 440 /etc/sudoers.d/99-sudo-log
+sudo visudo -cf /etc/sudoers
+```
+
+Verify logging:
+
+```bash
+sudo id
+sudo tail /var/log/sudo.log
+```
+
+Expected result: the log contains entries for sudo commands.
+
+---
+
+# 47. Improvement 2 — Configure Shell Inactivity Timeout
+
+Configure a 15-minute timeout for applicable interactive Bash sessions:
+
+```bash
+printf '%s\n' \
+  'TMOUT=900' \
+  'readonly TMOUT' \
+  'export TMOUT' \
+  | sudo tee /etc/profile.d/timeout.sh
+```
+
+Load the configuration in the current Bash session:
+
+```bash
+source /etc/profile.d/timeout.sh
+echo "$TMOUT"
+```
+
+Expected value:
+
+```text
+900
+```
+
+Reconnect through SSH and verify that the setting is applied in the new session. Note that shell startup behavior can vary; verify that the timeout is active for the intended login shell.
+
+---
+
+# 48. Improvement 3 — Require a Pseudo-Terminal for Sudo
+
+Configure sudo to use a pseudo-terminal:
+
+```bash
+echo 'Defaults use_pty' \
+  | sudo tee /etc/sudoers.d/10-use-pty
+```
+
+Set permissions and validate:
+
+```bash
+sudo chmod 440 /etc/sudoers.d/10-use-pty
+sudo visudo -cf /etc/sudoers
+```
+
+Verify the configured rule:
+
+```bash
+sudo grep -R 'use_pty' /etc/sudoers /etc/sudoers.d/
+```
+
+Expected configuration:
+
+```text
+Defaults use_pty
+```
+
+---
+
+# 49. Run the Follow-Up CIS Assessment
+
+Keep the initial report and generate a separate follow-up report:
+
+```bash
+cd ~/openscap-report
+
+sudo oscap xccdf eval \
+  --profile xccdf_org.ssgproject.content_profile_cis_server_l1 \
+  --results cis-results-after.xml \
+  --report cis-report-after.html \
+  /usr/share/xml/scap/ssg/content/ssg-rhel10-ds.xml
+```
+
+List the generated files:
+
+```bash
+ls -lh ~/openscap-report/
+```
+
+The directory should contain:
+
+```text
+cis-results.xml
+cis-report.html
+cis-results-after.xml
+cis-report-after.html
+```
+
+Compare the initial and follow-up HTML reports to determine which security findings changed.
+
+---
+
+# 50. OpenSCAP Validation Summary
+
+The assessment and hardening workflow is:
+
+```text
+Install OpenSCAP
+       |
+       v
+Select CIS Server Level 1
+       |
+       v
+Run Initial Assessment
+       |
+       v
+Review Security Findings
+       |
+       v
+Apply Selected Improvements
+       |
+       v
+Run Follow-Up Assessment
+       |
+       v
+Compare Reports
+```
+
+The assessment documents the security state of the RHEL 10 instance and provides evidence for evaluating selected hardening changes.
+
+
+
 
 ```
 ```
