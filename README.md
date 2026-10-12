@@ -505,3 +505,70 @@ The final solution can be summarized as:
 ```
 
 The result is a reusable, hardened RHEL 10 Golden Image that can be deployed consistently into AWS while keeping user-specific credentials outside the image.
+
+
+
+---
+
+## OpenSCAP Security Assessment and Hardening
+
+### Objective
+
+OpenSCAP was used to assess the RHEL 10 Golden Image against the CIS Server Level 1 security profile provided by the SCAP Security Guide package.
+
+The assessment identifies security configuration gaps and helps validate hardening improvements.
+
+### Tools and Security Profile
+
+- **OpenSCAP:** Security compliance scanner.
+- **SCAP Security Guide:** Provides security rules and profiles.
+- **Selected profile:** CIS Server Level 1 for RHEL 10.
+
+Profile ID:
+
+`xccdf_org.ssgproject.content_profile_cis_server_l1`
+
+### Initial Assessment
+
+The initial scan generated an HTML report and machine-readable results:
+
+- `cis-report.html`
+- `cis-results.xml`
+
+The assessment identified several configuration findings. Selected improvements were applied rather than blindly applying all automated remediations.
+
+### Security Improvements
+
+**1. Sudo command logging**
+
+Configured sudo to record privileged command activity in `/var/log/sudo.log`.
+
+Benefit: Improves traceability of administrative commands and supports troubleshooting and security reviews.
+
+**2. Shell inactivity timeout**
+
+Configured `TMOUT=900` for applicable interactive Bash sessions.
+
+Benefit: Helps reduce the risk of unattended shell sessions by applying a 15-minute inactivity timeout. The setting should be verified in a new login session.
+
+**3. Sudo pseudo-terminal enforcement**
+
+Configured `Defaults use_pty` through `/etc/sudoers.d/10-use-pty`.
+
+Benefit: Adds a security layer to privileged command execution and addresses a CIS hardening recommendation.
+
+### Validation
+
+The sudo configuration was validated using `visudo -cf /etc/sudoers`. Sudo logging was verified by executing a privileged command and checking `/var/log/sudo.log`.
+
+A follow-up OpenSCAP assessment generates:
+
+- `cis-report-after.html`
+- `cis-results-after.xml`
+
+The initial and follow-up reports can be compared to evaluate the impact of the changes. Only findings confirmed by the follow-up assessment should be reported as resolved.
+
+### Scope
+
+These changes improve selected local security controls. They do not, by themselves, provide centralized administrator session recording, fleet-wide patch management, or full CIS compliance.
+
