@@ -1128,9 +1128,8 @@ ssh \
 Example:
 
 ```bash
-  -i ~/.ssh/GOLDEN-keypair \
-  -p 2222 \
-  golden@3.145.128.XXX
+ssh -i /root/GOLDEN-keypair.pem \
+    -p 2222 golden@3.21.233.179
 ```
 
 ---
