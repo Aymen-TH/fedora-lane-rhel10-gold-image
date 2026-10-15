@@ -313,26 +313,41 @@ sudo restorecon -Rv /opt/httpd
 
 ---
 
-# 12. Create the HTTPD Container
+# 12. Create the HTTPD Container Manually
 
-The container exposes port `8080` internally.
-
-The host exposes it on port `35443`.
-
-Run:
+First, create the host directory that will contain the website:
 
 ```bash
-podman run -d \
-  --name httpd \
-  -p 35443:8080 \
-  -v /opt/httpd/html:/var/www/html:Z \
-  registry.access.redhat.com/ubi10/httpd-24
+sudo mkdir -p /opt/fedora-lane/httpd
 ```
+
+Create a test page:
+
+```bash
+echo 'Fedora Lane - httpd is working in a container!' | sudo tee /opt/fedora-lane/httpd/index.html
+```
+
+Run the container using Podman:
+
+```bash
+sudo podman run -d \
+  --name fedora-lane-httpd \
+  -p 35443:80 \
+  -v /opt/fedora-lane/httpd:/usr/local/apache2/htdocs:Z \
+  docker.io/library/httpd:2.4
+```
+
+**Configuration:**
+- Host port: `35443`
+- Container port: `80`
+- Host document root: `/opt/fedora-lane/httpd`
+- Container document root: `/usr/local/apache2/htdocs`
+- `:Z`: applies an appropriate private SELinux label to the mounted directory.
 
 Check the container:
 
 ```bash
-podman ps
+sudo podman ps
 ```
 
 Test locally:
@@ -341,36 +356,43 @@ Test locally:
 curl http://localhost:35443
 ```
 
-Expected:
+Expected output:
 
 ```text
 Fedora Lane - httpd is working in a container!
 ```
 
----
-
 # 13. Configure Podman Quadlet
 
-The container must automatically start when the machine starts.
+The container must automatically start when the machine boots.
 
-Instead of manually running `podman run` after every reboot, use **Quadlet**.
+Quadlet allows Podman containers to be defined and managed through systemd.
 
-Quadlet allows Podman containers to be described as systemd-managed units.
+## 13.1. Remove the manually created container
 
-Create the user Quadlet directory:
+Before switching to Quadlet, remove the manually created instance. Otherwise, Quadlet may fail because the container name is already in use.
 
 ```bash
-mkdir -p /etc/containers/systemd/
+sudo podman rm -f fedora-lane-httpd
+```
+
+This removes the container, not the website files on the host.
+
+## 13.2. Create the Quadlet definition
+
+Create the system-level Quadlet directory:
+
+```bash
+sudo mkdir -p /etc/containers/systemd
 ```
 
 Create the container definition:
 
 ```bash
-vi /etc/containers/systemd/fedora-lane-httpd.container
-
+sudo vi /etc/containers/systemd/fedora-lane-httpd.container
 ```
 
-The file contains:
+Add the following configuration:
 
 ```ini
 [Unit]
@@ -389,9 +411,65 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target
-
 ```
 
+## 13.3. Enable and start the service
+
+Reload systemd so it can process the Quadlet definition:
+
+```bash
+sudo systemctl daemon-reload
+```
+
+Enable and start the container:
+
+```bash
+sudo systemctl enable --now fedora-lane-httpd.service
+```
+
+## 13.4. Verify automatic startup
+
+Check the service:
+
+```bash
+sudo systemctl status fedora-lane-httpd.service
+```
+
+Check the container:
+
+```bash
+sudo podman ps
+```
+
+Test the website:
+
+```bash
+curl http://localhost:35443
+```
+
+Finally, reboot the machine when safe:
+
+```bash
+sudo systemctl reboot
+```
+
+After reconnecting, verify that the container started automatically:
+
+```bash
+sudo systemctl is-enabled fedora-lane-httpd.service
+sudo systemctl is-active fedora-lane-httpd.service
+sudo podman ps
+curl http://localhost:35443
+```
+
+Expected service results:
+
+```text
+enabled
+active
+```
+
+The website should return the same Fedora Lane test message after reboot.
 ---
 
 # 14. What the Quadlet File Does
