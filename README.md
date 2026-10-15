@@ -203,7 +203,7 @@ Individual administrator accounts are created instead of using the root account 
 Administrators belong to a dedicated group:
 
 ```text
-administrators
+fedora-admins
 ```
 
 The group receives sudo access.
